@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Post Summary Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Instagram Post Summary Extractor</h1>
+            <p>Upload an HTML file to extract and summarize Instagram posts</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="file-input-wrapper">
+                    <input type="file" id="htmlFile" accept=".html" />
+                    <label for="htmlFile" class="file-input-label">
+                        <span class="upload-icon">📁</span>
+                        Choose HTML File
+                    </label>
+                </div>
+                <button id="extractBtn" class="extract-btn" disabled>Extract Posts</button>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="summary-header">
+                    <h2>Extracted Posts Summary</h2>
+                    <div class="stats">
+                        <span id="postCount">0 posts found</span>
+                        <button id="downloadBtn" class="download-btn">Download Summary</button>
+                    </div>
+                </div>
+                
+                <div class="posts-container" id="postsContainer">
+                    <!-- Posts will be dynamically inserted here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
