@@ -11,8 +11,8 @@ class InstagramPostExtractor {
         const generateAiBtn = document.getElementById('generateAiBtn');
         const downloadBtn = document.getElementById('downloadBtn');
 
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
             if (file) {
                 extractBtn.disabled = false;
                 extractBtn.textContent = 'Extract Posts';
@@ -56,8 +56,8 @@ class InstagramPostExtractor {
     readFileAsText(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(new Error('Failed to read file'));
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = () => reject(new Error('Failed to read file'));
             reader.readAsText(file);
         });
     }
@@ -167,7 +167,6 @@ class InstagramPostExtractor {
     async generateOverallAiSummary() {
         const generateAiBtn = document.getElementById('generateAiBtn');
         const aiOverview = document.getElementById('aiOverview');
-        const originalText = generateAiBtn.textContent;
         
         generateAiBtn.textContent = 'Analyzing All Posts...';
         generateAiBtn.disabled = true;
@@ -231,23 +230,114 @@ class InstagramPostExtractor {
     extractOverallThemes(content) {
         const themes = [];
         
-        const themeKeywords = {
-            'Automotive': ['car', 'bmw', 'm3', 'm4', 'ferrari', 'alfa', 'chevrolet', 'corvette', 'vehicle', 'engine', 'gearbox', 'wheels', 'racing'],
-            'Sales & Commerce': ['sale', 'buy', 'price', 'sell', 'purchase', 'deal', 'inquir', 'contact', 'dm', 'call'],
-            'Luxury & Premium': ['luxury', 'premium', 'exclusive', 'high-end', 'expensive', 'elite', 'sophisticated'],
-            'Performance & Racing': ['speed', 'power', 'performance', 'racing', 'track', 'fast', 'acceleration', 'horsepower'],
-            'Lifestyle & Culture': ['lifestyle', 'style', 'fashion', 'trend', 'cool', 'culture', 'community'],
-            'Technical & Specs': ['specification', 'technical', 'engine', 'transmission', 'modification', 'upgrade']
-        };
+        // Dynamic keyword extraction - find the most frequent meaningful words
+        const words = content.toLowerCase()
+            .replace(/[^\w\s]/g, ' ')
+            .split(/\s+/)
+            .filter(word => word.length > 3) // Filter out short words
+            .filter(word => !this.isStopWord(word)); // Filter out common stop words
         
-        Object.keys(themeKeywords).forEach(theme => {
-            const matches = themeKeywords[theme].filter(keyword => content.includes(keyword)).length;
-            if (matches > 0) {
-                themes.push({ name: theme, strength: matches });
+        // Count word frequencies
+        const wordCounts = {};
+        words.forEach(word => {
+            wordCounts[word] = (wordCounts[word] || 0) + 1;
+        });
+        
+        // Get top frequent words
+        const topWords = Object.entries(wordCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 20)
+            .map(([word, count]) => ({ word, count }));
+        
+        // Categorize themes based on semantic clusters
+        const themeCategories = this.categorizeWords(topWords);
+        
+        // Convert to theme format
+        Object.entries(themeCategories).forEach(([category, words]) => {
+            if (words.length > 0) {
+                const totalStrength = words.reduce((sum, w) => sum + w.count, 0);
+                themes.push({ 
+                    name: category, 
+                    strength: totalStrength,
+                    keywords: words.map(w => w.word)
+                });
             }
         });
         
         return themes.sort((a, b) => b.strength - a.strength);
+    }
+
+    isStopWord(word) {
+        const stopWords = new Set([
+            'this', 'that', 'with', 'have', 'will', 'from', 'they', 'know', 'want', 'been',
+            'good', 'much', 'some', 'time', 'very', 'when', 'come', 'here', 'just', 'like',
+            'long', 'make', 'many', 'over', 'such', 'take', 'than', 'them', 'well', 'were',
+            'what', 'your', 'about', 'after', 'again', 'before', 'being', 'below', 'between',
+            'both', 'during', 'each', 'further', 'having', 'into', 'more', 'most', 'other',
+            'same', 'should', 'through', 'under', 'until', 'while', 'above', 'against',
+            'because', 'doing', 'down', 'during', 'once', 'only', 'then', 'there', 'these',
+            'those', 'where', 'which', 'who', 'why', 'would', 'could', 'might', 'must',
+            'shall', 'should', 'ought', 'need', 'dare', 'used'
+        ]);
+        return stopWords.has(word);
+    }
+
+    categorizeWords(topWords) {
+        const categories = {
+            'Beauty & Cosmetics': [],
+            'Fitness & Health': [],
+            'Travel & Places': [],
+            'Food & Cooking': [],
+            'Books & Reading': [],
+            'Automotive': [],
+            'Fashion & Style': [],
+            'Technology': [],
+            'Business & Finance': [],
+            'Art & Culture': [],
+            'Lifestyle': [],
+            'Education': [],
+            'Entertainment': []
+        };
+        
+        const semanticMaps = {
+            'Beauty & Cosmetics': ['makeup', 'beauty', 'cosmetics', 'lipstick', 'eyeshadow', 'foundation', 'mascara', 'blush', 'highlighter', 'skincare', 'glam', 'tutorial', 'products', 'brand', 'palette', 'shade', 'color', 'look', 'skin', 'face'],
+            'Fitness & Health': ['workout', 'exercise', 'fitness', 'pilates', 'yoga', 'training', 'health', 'body', 'muscle', 'strength', 'cardio', 'weight', 'diet', 'nutrition', 'wellness', 'core', 'abs', 'legs', 'arms', 'routine'],
+            'Travel & Places': ['travel', 'paris', 'france', 'trip', 'vacation', 'destination', 'city', 'place', 'visit', 'explore', 'adventure', 'journey', 'location', 'restaurant', 'hotel', 'culture', 'experience', 'guide', 'itinerary', 'hidden'],
+            'Food & Cooking': ['food', 'recipe', 'cooking', 'kitchen', 'chef', 'meal', 'dinner', 'lunch', 'breakfast', 'ingredients', 'taste', 'flavor', 'restaurant', 'cuisine', 'dish', 'baking', 'delicious', 'eat', 'drink', 'coffee'],
+            'Books & Reading': ['book', 'books', 'read', 'reading', 'author', 'novel', 'story', 'literature', 'philosophy', 'knowledge', 'learn', 'education', 'wisdom', 'text', 'writing', 'page', 'chapter', 'library', 'study', 'recommend'],
+            'Automotive': ['car', 'cars', 'bmw', 'ferrari', 'vehicle', 'engine', 'racing', 'speed', 'performance', 'automotive', 'drive', 'road', 'motor', 'wheels', 'auto', 'sale', 'dealer', 'luxury', 'sports', 'model'],
+            'Fashion & Style': ['fashion', 'style', 'outfit', 'clothing', 'dress', 'shirt', 'pants', 'shoes', 'accessories', 'trend', 'wardrobe', 'designer', 'brand', 'collection', 'wear', 'look', 'chic', 'elegant', 'casual', 'formal'],
+            'Technology': ['tech', 'technology', 'software', 'app', 'digital', 'computer', 'phone', 'device', 'innovation', 'data', 'internet', 'online', 'platform', 'system', 'code', 'programming', 'artificial', 'intelligence', 'future', 'smart'],
+            'Business & Finance': ['business', 'finance', 'money', 'investment', 'market', 'economy', 'company', 'entrepreneur', 'success', 'growth', 'profit', 'sales', 'marketing', 'strategy', 'leadership', 'management', 'career', 'professional', 'work', 'industry'],
+            'Art & Culture': ['art', 'culture', 'music', 'artist', 'creative', 'design', 'gallery', 'museum', 'exhibition', 'painting', 'sculpture', 'photography', 'film', 'movie', 'theater', 'performance', 'aesthetic', 'visual', 'artistic', 'cultural'],
+            'Lifestyle': ['lifestyle', 'life', 'daily', 'routine', 'home', 'family', 'friends', 'personal', 'happiness', 'motivation', 'inspiration', 'goals', 'mindset', 'positive', 'growth', 'development', 'balance', 'wellness', 'self', 'living'],
+            'Education': ['education', 'learn', 'learning', 'school', 'university', 'student', 'teacher', 'course', 'class', 'study', 'knowledge', 'skill', 'training', 'development', 'academic', 'research', 'science', 'subject', 'lesson', 'tutorial'],
+            'Entertainment': ['entertainment', 'fun', 'game', 'play', 'show', 'series', 'comedy', 'drama', 'celebrity', 'star', 'famous', 'popular', 'viral', 'trending', 'social', 'media', 'content', 'video', 'photo', 'post']
+        };
+        
+        topWords.forEach(({ word, count }) => {
+            let bestMatch = null;
+            let bestScore = 0;
+            
+            Object.entries(semanticMaps).forEach(([category, keywords]) => {
+                if (keywords.includes(word)) {
+                    const score = count;
+                    if (score > bestScore) {
+                        bestMatch = category;
+                        bestScore = score;
+                    }
+                }
+            });
+            
+            if (bestMatch) {
+                categories[bestMatch].push({ word, count });
+            } else {
+                // If no category match, add to lifestyle as catch-all
+                categories['Lifestyle'].push({ word, count });
+            }
+        });
+        
+        return categories;
     }
 
     analyzeOverallSentiment(content) {
@@ -274,16 +364,54 @@ class InstagramPostExtractor {
     }
 
     determineContentFocus(content) {
-        if (content.includes('sale') || content.includes('buy') || content.includes('price')) {
-            return 'Commercial/Sales Focus';
+        // Dynamic content focus detection based on most frequent themes
+        const themes = this.extractOverallThemes(content);
+        
+        if (themes.length === 0) {
+            return 'General Social Media Content';
         }
-        if (content.includes('car') || content.includes('bmw') || content.includes('ferrari')) {
-            return 'Automotive Enthusiast Content';
+        
+        const primaryTheme = themes[0].name;
+        const secondaryTheme = themes.length > 1 ? themes[1].name : null;
+        
+        // Check for commercial intent
+        const commercialKeywords = ['sale', 'buy', 'price', 'sell', 'purchase', 'deal', 'contact', 'dm', 'inquir'];
+        const hasCommercialIntent = commercialKeywords.some(keyword => content.includes(keyword));
+        
+        if (hasCommercialIntent) {
+            return `Commercial ${primaryTheme} Content`;
         }
-        if (content.includes('lifestyle') || content.includes('style')) {
-            return 'Lifestyle & Culture';
+        
+        // Check for educational/tutorial content
+        const educationalKeywords = ['tutorial', 'guide', 'tips', 'howto', 'learn', 'teach', 'step', 'instruction'];
+        const hasEducationalIntent = educationalKeywords.some(keyword => content.includes(keyword));
+        
+        if (hasEducationalIntent) {
+            return `Educational ${primaryTheme} Content`;
         }
-        return 'General Social Media Content';
+        
+        // Check for review/recommendation content
+        const reviewKeywords = ['review', 'recommend', 'best', 'top', 'favorite', 'love', 'hate', 'opinion', 'rating'];
+        const hasReviewIntent = reviewKeywords.some(keyword => content.includes(keyword));
+        
+        if (hasReviewIntent) {
+            return `${primaryTheme} Reviews & Recommendations`;
+        }
+        
+        // Check for inspirational content
+        const inspirationalKeywords = ['inspiration', 'motivat', 'goal', 'dream', 'achieve', 'success', 'transform'];
+        const hasInspirationalIntent = inspirationalKeywords.some(keyword => content.includes(keyword));
+        
+        if (hasInspirationalIntent) {
+            return `Inspirational ${primaryTheme} Content`;
+        }
+        
+        // Multi-theme content
+        if (secondaryTheme && themes[1].strength > themes[0].strength * 0.7) {
+            return `${primaryTheme} & ${secondaryTheme} Content`;
+        }
+        
+        return `${primaryTheme} Content`;
     }
 
     calculateOverallEngagement(content) {
@@ -314,26 +442,70 @@ class InstagramPostExtractor {
     generateKeyInsights(content, themes, contentType) {
         const insights = [];
         
-        if (themes.length > 0 && themes[0].name === 'Automotive') {
-            insights.push('Strong automotive focus with car enthusiast content');
+        if (themes.length === 0) {
+            insights.push('Content analysis shows diverse, general social media posting');
+            return insights;
         }
         
-        if (content.includes('sale') && content.includes('price')) {
+        const primaryTheme = themes[0];
+        const secondaryTheme = themes.length > 1 ? themes[1] : null;
+        
+        // Primary theme insights
+        insights.push(`Strong focus on ${primaryTheme.name.toLowerCase()} with ${primaryTheme.strength} relevant mentions`);
+        
+        // Multi-theme insights
+        if (secondaryTheme && secondaryTheme.strength > primaryTheme.strength * 0.5) {
+            insights.push(`Secondary focus on ${secondaryTheme.name.toLowerCase()} creates diverse content mix`);
+        }
+        
+        // Content type specific insights
+        if (contentType.includes('Commercial')) {
             insights.push('Commercial intent detected with sales-oriented messaging');
         }
         
-        if (themes.some(t => t.name === 'Luxury & Premium')) {
-            insights.push('Premium/luxury positioning evident in content');
+        if (contentType.includes('Educational')) {
+            insights.push('Educational content with tutorials and instructional guidance');
         }
         
-        const carBrands = ['bmw', 'ferrari', 'alfa', 'chevrolet'];
-        const mentionedBrands = carBrands.filter(brand => content.includes(brand));
-        if (mentionedBrands.length > 1) {
-            insights.push(`Multi-brand content featuring ${mentionedBrands.length} different automotive brands`);
+        if (contentType.includes('Reviews')) {
+            insights.push('Review-focused content with recommendations and opinions');
         }
         
-        if (content.includes('m3') || content.includes('m4')) {
-            insights.push('BMW M-series performance vehicles prominently featured');
+        if (contentType.includes('Inspirational')) {
+            insights.push('Motivational content aimed at inspiring and encouraging followers');
+        }
+        
+        // Dynamic keyword insights based on top themes
+        if (primaryTheme.keywords && primaryTheme.keywords.length > 0) {
+            const topKeywords = primaryTheme.keywords.slice(0, 3);
+            insights.push(`Key topics include: ${topKeywords.join(', ')}`);
+        }
+        
+        // Engagement indicators
+        const engagementWords = ['love', 'amazing', 'beautiful', 'perfect', 'incredible', 'awesome', 'fantastic'];
+        const engagementCount = engagementWords.filter(word => content.includes(word)).length;
+        if (engagementCount > 3) {
+            insights.push('High emotional engagement with positive language throughout');
+        }
+        
+        // Tutorial/educational content
+        if (content.includes('tutorial') || content.includes('guide') || content.includes('tips')) {
+            insights.push('Educational value with step-by-step guidance and tips');
+        }
+        
+        // Community building
+        if (content.includes('community') || content.includes('follow') || content.includes('share')) {
+            insights.push('Community-building focus with calls for engagement');
+        }
+        
+        // Trend awareness
+        if (content.includes('trend') || content.includes('viral') || content.includes('popular')) {
+            insights.push('Trend-aware content leveraging popular topics');
+        }
+        
+        // Multi-category content strategy
+        if (themes.length > 3) {
+            insights.push(`Diverse content strategy spanning ${themes.length} different themes`);
         }
         
         return insights;
@@ -343,23 +515,75 @@ class InstagramPostExtractor {
         let summary = `This collection of ${totalPosts} Instagram posts `;
         
         if (themes.length > 0) {
-            summary += `primarily focuses on ${themes[0].name.toLowerCase()} content, `;
+            const primaryTheme = themes[0].name.toLowerCase();
+            summary += `primarily focuses on ${primaryTheme} content, `;
         }
         
         summary += `with a ${sentiment.toLowerCase()} overall tone. `;
         
-        if (contentType.includes('Commercial')) {
-            summary += 'The content shows strong commercial intent with multiple sales-oriented posts. ';
+        // Dynamic content type descriptions based on detected themes
+        if (contentType.includes('Beauty') || contentType.includes('Cosmetics')) {
+            summary += 'The content showcases beauty tutorials, product reviews, and makeup inspiration for followers interested in cosmetics and skincare. ';
+        } else if (contentType.includes('Fitness') || contentType.includes('Health')) {
+            summary += 'The content provides workout routines, fitness tips, and health guidance for followers pursuing an active lifestyle. ';
+        } else if (contentType.includes('Travel') || contentType.includes('Places')) {
+            summary += 'The content showcases travel experiences, destination guides, and cultural exploration for wanderlust-driven followers. ';
+        } else if (contentType.includes('Books') || contentType.includes('Reading')) {
+            summary += 'The content features book recommendations, literary discussions, and reading inspiration for book enthusiasts and learners. ';
+        } else if (contentType.includes('Food') || contentType.includes('Cooking')) {
+            summary += 'The content features recipes, cooking tips, and culinary inspiration for food enthusiasts. ';
         } else if (contentType.includes('Automotive')) {
-            summary += 'The content targets automotive enthusiasts with detailed vehicle showcases. ';
+            summary += 'The content targets automotive enthusiasts with detailed vehicle showcases and car culture. ';
+        } else if (contentType.includes('Fashion') || contentType.includes('Style')) {
+            summary += 'The content highlights fashion trends, style inspiration, and outfit ideas. ';
+        } else if (contentType.includes('Technology')) {
+            summary += 'The content covers technology trends, product reviews, and digital innovation. ';
+        } else if (contentType.includes('Business') || contentType.includes('Finance')) {
+            summary += 'The content focuses on business insights, financial advice, and professional development. ';
+        } else if (contentType.includes('Art') || contentType.includes('Culture')) {
+            summary += 'The content celebrates artistic expression, cultural experiences, and creative inspiration. ';
+        } else if (contentType.includes('Commercial')) {
+            summary += 'The content shows strong commercial intent with sales-oriented messaging and product promotion. ';
+        } else if (contentType.includes('Educational')) {
+            summary += 'The content provides educational value with tutorials, guides, and learning resources. ';
+        } else if (contentType.includes('Reviews')) {
+            summary += 'The content offers reviews, recommendations, and opinions to guide follower decisions. ';
+        } else if (contentType.includes('Inspirational')) {
+            summary += 'The content aims to motivate and inspire followers with uplifting messages and success stories. ';
         }
         
         if (themes.length > 2) {
-            summary += `The posts cover diverse themes including ${themes.slice(0, 3).map(t => t.name.toLowerCase()).join(', ')}, `;
+            const topThemes = themes.slice(0, 3).map(t => t.name.toLowerCase()).join(', ');
+            summary += `The posts cover diverse themes including ${topThemes}, `;
             summary += 'indicating a well-rounded content strategy. ';
         }
         
-        summary += 'This appears to be content from an automotive-focused account with both commercial and enthusiast appeal.';
+        // Dynamic account type determination based on primary content
+        const primaryTheme = themes.length > 0 ? themes[0].name : 'General';
+        
+        if (primaryTheme.includes('Beauty') || primaryTheme.includes('Cosmetics')) {
+            summary += 'This appears to be content from a beauty-focused account with both educational and inspirational appeal.';
+        } else if (primaryTheme.includes('Fitness') || primaryTheme.includes('Health')) {
+            summary += 'This appears to be content from a fitness-focused account with both instructional and motivational appeal.';
+        } else if (primaryTheme.includes('Travel') || primaryTheme.includes('Places')) {
+            summary += 'This appears to be content from a travel-focused account sharing experiences and destination inspiration.';
+        } else if (primaryTheme.includes('Books') || primaryTheme.includes('Reading')) {
+            summary += 'This appears to be content from a book-focused account with literary recommendations and intellectual discussions.';
+        } else if (primaryTheme.includes('Food') || primaryTheme.includes('Cooking')) {
+            summary += 'This appears to be content from a food-focused account with culinary expertise and recipe sharing.';
+        } else if (primaryTheme.includes('Automotive')) {
+            summary += 'This appears to be content from an automotive-focused account with both commercial and enthusiast appeal.';
+        } else if (primaryTheme.includes('Fashion') || primaryTheme.includes('Style')) {
+            summary += 'This appears to be content from a fashion-focused account with style guidance and trend awareness.';
+        } else if (primaryTheme.includes('Technology')) {
+            summary += 'This appears to be content from a tech-focused account with innovation insights and product coverage.';
+        } else if (primaryTheme.includes('Business') || primaryTheme.includes('Finance')) {
+            summary += 'This appears to be content from a business-focused account with professional insights and financial guidance.';
+        } else if (primaryTheme.includes('Art') || primaryTheme.includes('Culture')) {
+            summary += 'This appears to be content from an arts and culture account celebrating creativity and cultural experiences.';
+        } else {
+            summary += 'This appears to be content from a lifestyle account with diverse interests and broad appeal.';
+        }
         
         return summary;
     }
@@ -409,7 +633,7 @@ class InstagramPostExtractor {
                         <h4>📊 Content Themes</h4>
                         <div class="themes-list">
                             ${summary.themes.map(theme => `
-                                <span class="theme-tag" style="opacity: ${Math.min(1, theme.strength / 5)}">
+                                <span class="theme-tag" style="opacity: ${Math.min(1, theme.strength / 10)}" title="Keywords: ${theme.keywords ? theme.keywords.join(', ') : 'N/A'}">
                                     ${theme.name} (${theme.strength})
                                 </span>
                             `).join('')}
@@ -485,7 +709,7 @@ class InstagramPostExtractor {
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = `instagram_ai_analysis_${new Date().toISOString().split('T')[0]}.html`;
+        a.download = `instagram_content_analysis_${new Date().toISOString().split('T')[0]}.html`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -532,6 +756,7 @@ class InstagramPostExtractor {
                         <div class="themes-list">
                             ${this.overallSummary.themes.map(theme => `
                                 <span class="theme-tag">${theme.name} (${theme.strength} mentions)</span>
+                                ${theme.keywords ? `<div class="theme-keywords">Keywords: ${theme.keywords.join(', ')}</div>` : ''}
                             `).join('')}
                         </div>
                     </div>
@@ -553,7 +778,7 @@ class InstagramPostExtractor {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Analysis Report - ${currentDate}</title>
+    <title>Instagram Content Analysis Report - ${currentDate}</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -610,6 +835,13 @@ class InstagramPostExtractor {
             padding: 8px 15px;
             border-radius: 20px;
             font-size: 0.9rem;
+            cursor: help;
+        }
+        .theme-keywords {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
         }
         .insights-section ul {
             background: #f8f9fa;
@@ -664,7 +896,7 @@ class InstagramPostExtractor {
 </head>
 <body>
     <div class="header">
-        <h1>🤖 Instagram Analysis Report</h1>
+        <h1>🤖 Instagram Content Analysis Report</h1>
         <p>Generated on ${currentDate}</p>
     </div>
     
@@ -692,7 +924,7 @@ class InstagramPostExtractor {
     `).join('')}
     
     <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666;">
-        <p>Report generated by AI-Powered Instagram Post Analyzer</p>
+        <p>Report generated by AI-Powered Instagram Content Analyzer</p>
     </div>
 </body>
 </html>`;
